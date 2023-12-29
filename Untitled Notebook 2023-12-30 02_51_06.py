@@ -13,7 +13,7 @@ data = [
     Row(jsondata=json.dumps([{"name": "David", "id": 4}, {"name": "Emma", "id": 5}]))
 ]
 
-# Создание DataFrame
+
 df2 = spark.createDataFrame(data)
 
 # COMMAND ----------
