@@ -54,7 +54,3 @@ def writeStreamTo(self, df, tableName):
         .option("mergeSchema", "true")  \
         .option("checkpointLocation", self.lakeConfig.getCheckpointLocation(tableName)).toTable(self.lakeConfig.getTableRef(tableName))
 
-
-# COMMAND ----------
-
-writeStreamTo(df3, "tabll" )
