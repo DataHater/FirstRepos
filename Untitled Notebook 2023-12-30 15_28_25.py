@@ -5,15 +5,16 @@ import json
 
 
 data = [
-    Row(jsondata=json.dumps([{"name": "Alice", "id": 1}, {"name": "Bob", "id": 2}])),
-    Row(jsondata=json.dumps([{"name": "Christina", "id": 3}])),
-    Row(jsondata=json.dumps([{"name": "David", "id": 4}, {"name": "Emma", "id": 5}]))
+    Row(jsondata=json.dumps([{"name": "David", "id": 4, "city": "Kar"}, {"name": "Emma", "id": 5, "city": "Sidney"}])),
+    Row(jsondata=json.dumps([{"name": "Wavid", "id": 2, "city": "NY"}, {"name": "mma", "id": 53, "city": "LA"}]))
 ]
 
 # COMMAND ----------
 
 df = spark.createDataFrame(data)
-df.write.json("/FileStore/tables/")
+
+# Перезапись данных в JSON-файл
+df.write.mode("overwrite").json("/FileStore/tables/")
 
 # COMMAND ----------
 
@@ -22,7 +23,8 @@ from pyspark.sql.types import StructType, StringType, IntegerType, ArrayType
 # Определение схемы данных
 schema = StructType() \
     .add("name", StringType()) \
-    .add("id", IntegerType())
+    .add("id", IntegerType()) \
+    .add("city", StringType()) \
 
 schema_lake_segments = ArrayType(schema, True)
 
@@ -31,24 +33,33 @@ stream_df = spark.readStream.schema(schema).json("/FileStore/tables/")
 
 # COMMAND ----------
 
-from pyspark.sql.types import StructType, StringType, ArrayType, IntegerType
-from pyspark.sql.functions import from_json, col, explode
+from pyspark.sql.types import StructType, StringType, StructField, IntegerType
+from pyspark.sql.functions import from_json, col
+import json
 
-# Используйте правильную схему для чтения потокового DataFrame
+# Create the schema for the stream DataFrame
 schema_stream = StructType().add("jsondata", StringType())
-schema_lake_segments = ArrayType(StructType().add("name", StringType()).add("id", IntegerType()))
+# Create the schema for the data in the JSON payload
+schema_lake_segments = StructType([
+    StructField("name", StringType()),
+    StructField("id", IntegerType()),
+    StructField("city", StringType())
+])
 
-# Чтение потокового DataFrame
+# Convert the schema to a format that can be used in from_json()
+schema_json = schema_lake_segments.json()
+
+# Read the stream DataFrame
 stream_df = spark.readStream.schema(schema_stream).json("/FileStore/tables/")
 
-# Преобразование данных
-df_stream_transformed = stream_df.withColumn("testdata", from_json(col("jsondata"), schema_lake_segments)) \
+# Transform the stream DataFrame
+df_stream_transformed = stream_df \
+    .withColumn("testdata", from_json(col("jsondata"), schema_json)) \
     .drop("jsondata") \
-    .withColumn("segment_struct", explode(col("testdata"))) \
-    .drop("testdata") \
-    .withColumn("name", col("segment_struct.name")) \
-    .withColumn("id", col("segment_struct.id")) \
-    .drop("segment_struct")
+    .withColumn("name", col("testdata.name")) \
+    .withColumn("id", col("testdata.id")) \
+    .withColumn("city", col("testdata.city")) \
+    .drop("testdata")
 
 # COMMAND ----------
 
@@ -62,7 +73,7 @@ class LakeConfig:
     def getTableRef(self, tableName):
         return f"{self.basePath}/tables/{tableName}"
 
-lakeConfig = LakeConfig("dbfs:/user/hive/warehouse")
+lakeConfig = LakeConfig("dbfs:/user/hive/warehouse/default")
 
 def writeStreamTo(df, tableName):
     tablePath = lakeConfig.getTableRef(tableName)
@@ -75,8 +86,4 @@ def writeStreamTo(df, tableName):
         .start(tablePath)  # Изменено на start для указания пути
 
 # Использование функции с вашим потоковым DataFrame
-writeStreamTo(df_stream_transformed, "test_Table")
-
-# COMMAND ----------
-
-
+writeStreamTo(df_stream_transformed, "new_test_table")
