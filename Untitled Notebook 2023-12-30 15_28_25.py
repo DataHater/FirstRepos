@@ -18,19 +18,29 @@ df.write.mode("overwrite").json("/FileStore/tables/")
 
 # COMMAND ----------
 
-from pyspark.sql.types import StructType, StringType, IntegerType, ArrayType
+from pyspark.sql.types import StructType, StringType, StructField, IntegerType, ArrayType
+from pyspark.sql.functions import explode, from_json, col
 
-# Определение схемы данных
-schema = StructType() \
-    .add("name", StringType()) \
-    .add("id", IntegerType()) \
-    .add("city", StringType()) \
+# Схема для данных внутри JSON
+schema = StructType([
+    StructField("name", StringType()),
+    StructField("id", IntegerType()),
+])
 
-schema_lake_segments = ArrayType(schema, True)
+# Схема для чтения потока
+schema_stream = StructType().add("jsondata", StringType())
 
-# Создание потокового DataFrame путем чтения из каталога
-stream_df = spark.readStream.schema(schema).json("/FileStore/tables/")
-display(stream_df)
+# Чтение потока с одним полем jsondata
+stream_df = spark.readStream.schema(schema_stream).json("/FileStore/tables/")
+
+# Преобразование jsondata в структурированный формат и расширение массивов
+transformed_stream_df = stream_df \
+    .withColumn("json_array", from_json("jsondata", ArrayType(schema))) \
+    .withColumn("exploded", explode("json_array")) \
+    .select("exploded.*")
+
+# Отображение преобразованного потока
+display(transformed_stream_df)
 
 # COMMAND ----------
 
@@ -59,7 +69,6 @@ df_stream_transformed = stream_df \
     .drop("jsondata") \
     .withColumn("name", col("testdata.name")) \
     .withColumn("id", col("testdata.id")) \
-    .withColumn("city", col("testdata.city")) \
     .drop("testdata")
 
 display(df_stream_transformed)
@@ -89,4 +98,4 @@ def writeStreamTo(df, tableName):
         .start(tablePath)  # Изменено на start для указания пути
 
 # Использование функции с вашим потоковым DataFrame
-writeStreamTo(df_stream_transformed, "new_test_table")
+writeStreamTo(transformed_stream_df, "new_test_table")
