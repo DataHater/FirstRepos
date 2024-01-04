@@ -30,6 +30,7 @@ schema_lake_segments = ArrayType(schema, True)
 
 # Создание потокового DataFrame путем чтения из каталога
 stream_df = spark.readStream.schema(schema).json("/FileStore/tables/")
+display(stream_df)
 
 # COMMAND ----------
 
@@ -43,7 +44,7 @@ schema_stream = StructType().add("jsondata", StringType())
 schema_lake_segments = StructType([
     StructField("name", StringType()),
     StructField("id", IntegerType()),
-    StructField("city", StringType())
+    StructField("city", StringType()),
 ])
 
 # Convert the schema to a format that can be used in from_json()
@@ -60,6 +61,8 @@ df_stream_transformed = stream_df \
     .withColumn("id", col("testdata.id")) \
     .withColumn("city", col("testdata.city")) \
     .drop("testdata")
+
+display(df_stream_transformed)
 
 # COMMAND ----------
 
