@@ -14,7 +14,7 @@ data = [
 df = spark.createDataFrame(data)
 
 # Перезапись данных в JSON-файл
-df.write.mode("overwrite").json("/FileStore/tables/")
+df.write.mode("overwrite").json("/FileStore/tablesr/")
 
 # COMMAND ----------
 
@@ -25,13 +25,14 @@ from pyspark.sql.functions import explode, from_json, col
 schema = StructType([
     StructField("name", StringType()),
     StructField("id", IntegerType()),
+    StructField("city", IntegerType()),
 ])
 
 # Схема для чтения потока
 schema_stream = StructType().add("jsondata", StringType())
 
 # Чтение потока с одним полем jsondata
-stream_df = spark.readStream.schema(schema_stream).json("/FileStore/tables/")
+stream_df = spark.readStream.schema(schema_stream).json("/FileStore/tablesr/")
 
 # Преобразование jsondata в структурированный формат и расширение массивов
 transformed_stream_df = stream_df \
@@ -41,37 +42,6 @@ transformed_stream_df = stream_df \
 
 # Отображение преобразованного потока
 display(transformed_stream_df)
-
-# COMMAND ----------
-
-from pyspark.sql.types import StructType, StringType, StructField, IntegerType
-from pyspark.sql.functions import from_json, col
-import json
-
-# Create the schema for the stream DataFrame
-schema_stream = StructType().add("jsondata", StringType())
-# Create the schema for the data in the JSON payload
-schema_lake_segments = StructType([
-    StructField("name", StringType()),
-    StructField("id", IntegerType()),
-    StructField("city", StringType()),
-])
-
-# Convert the schema to a format that can be used in from_json()
-schema_json = schema_lake_segments.json()
-
-# Read the stream DataFrame
-stream_df = spark.readStream.schema(schema_stream).json("/FileStore/tables/")
-
-# Transform the stream DataFrame
-df_stream_transformed = stream_df \
-    .withColumn("testdata", from_json(col("jsondata"), schema_json)) \
-    .drop("jsondata") \
-    .withColumn("name", col("testdata.name")) \
-    .withColumn("id", col("testdata.id")) \
-    .drop("testdata")
-
-display(df_stream_transformed)
 
 # COMMAND ----------
 
